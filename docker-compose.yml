@@ -1,0 +1,22 @@
+# Runs Ollama as a persistent container so the HexDocs MCP server can reach it
+# at the hardcoded localhost:11434 by sharing this container's network namespace.
+#
+# Usage:
+#   docker compose up -d          # start Ollama (the MCP container attaches to it)
+#   docker compose down           # stop Ollama (keeps the model volume)
+#
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Keeps the embedding model loaded in memory across calls for better performance
+    environment:
+      - OLLAMA_KEEP_ALIVE=5m
+
+volumes:
+  ollama_data:
