@@ -18,33 +18,22 @@ independently:
 1. **HexDocs MCP** — a short-lived, on-demand container launched by your MCP client
    (VS Code) via `docker run --rm -i`. Its embedded Elixir backend always talks to
    Ollama at the **hardcoded `localhost:11434`** (it does not read an Ollama URL env var).
-2. **Ollama** — a long-lived embedding server. Where it runs is up to the **host**,
-   and the MCP container is launched in whatever network mode makes `localhost:11434`
-   reach it.
-
-Because the backend's address is fixed, "choosing an Ollama" is really **choosing the
-container's network mode**:
-
-| Host / platform | Recommended Ollama location | MCP `--network` | Sample file |
-|-----------------|-----------------------------|-----------------|-------------|
-| **Docker Desktop (Windows / Mac)** | Ollama **container** via `docker compose` | `container:ollama` | [`mcp.json`](./mcp.json) (default) |
-| **Linux / Colima (Linux VM)** | Native host Ollama | `host` | [`mcp.native.json`](./mcp.native.json) |
-
-> **Why two options?** On **Docker Desktop**, `--network host` maps the container's
-> `localhost` to the Docker **VM**, not your Windows/Mac host — so a **native** host
-> Ollama can't be reached at `localhost:11434` from a container. Running Ollama as a
-> container (and sharing its network namespace via `container:ollama`) fixes that and
-> works on every platform. On **native Linux** (or Linux VMs like Colima), the host and
-> the container network are the same, so `--network host` lets the backend reach your
-> host's native Ollama directly.
+2. **Ollama** — a long-lived embedding server, run as a container so the MCP server
+   can reach it at `localhost:11434` by sharing its network namespace.
 
 ```mermaid
 graph LR
   A[VS Code / MCP client] -- stdio --> B[hexdocs-mcp container]
-  B -- localhost:11434 --> C[Ollama]
-  C -. container option .-> D[(ollama_data volume)]
-  C -. native option .-> E[native host Ollama]
+  B -- localhost:11434 (--network container:ollama) --> C[Ollama container]
+  C -- persists --> D[(ollama_data volume)]
 ```
+
+> **Why a container for Ollama?** On **Docker Desktop**, `--network host` maps the
+> container's `localhost` to the Docker **VM**, not your host — so a native host Ollama
+> can't be reached at `localhost:11434` from a container. Running Ollama as a container
+> and sharing its network namespace (`--network container:ollama`) fixes that and works
+> on every platform. (On native Linux only, `--network host` can reach a host Ollama,
+> but the container approach succeeds there too, so we standardize on it.)
 
 > **⚠️ Semantic features require Ollama.** The `fetch` (embedding) and `search`
 > (semantic search) tools need a running Ollama server with the embedding model
@@ -97,10 +86,6 @@ docker pull ghcr.io/pranaypant/hexdocs-mcp-global:latest
 
 ### 2. Run Ollama first (required for embeddings)
 
-Pick the path for your platform (see the [architecture table](#architecture-decoupled)):
-
-**A) Docker Desktop (Windows / Mac) — Ollama container (recommended, default)**
-
 You don't need this repo to get Ollama running — use plain `docker run`:
 
 ```bash
@@ -112,12 +97,7 @@ docker exec ollama ollama pull nomic-embed-text
 > If you've cloned this repo, `docker compose up -d` does the exact same thing
 > (that's what [`docker-compose.yml`](./docker-compose.yml) defines). Both produce a
 > container named `ollama`, which the MCP server expects for `--network container:ollama`.
-
-**B) Linux / Colima — native host Ollama**
-
-Just make sure Ollama is running on your host (`ollama serve`) and the embedding
-model is pulled (`ollama pull nomic-embed-text`). No container needed.
-
+>
 > Both `nomic-embed-text` and `mxbai-embed-large` are supported; pull whichever the
 > server requests. The published image requests `nomic-embed-text`.
 
@@ -142,15 +122,13 @@ config (applies to every project). Both use the same file format.
 
 #### 4a. Create `.vscode/mcp.json` (workspace — recommended)
 
-> Ready-to-copy samples live at the **repo root**: [`mcp.json`](./mcp.json) for the
-> container-Ollama default, or [`mcp.native.json`](./mcp.native.json) for Linux/Colima
-> native host Ollama.
+> A ready-to-copy sample lives at the **repo root as [`mcp.json`](./mcp.json)**.
 
-1. Start Ollama for your platform first (see step 2 above).
+1. Start Ollama first (see step 2 above).
 2. In the root of your project, create a folder named `.vscode` (if it doesn't
    already exist).
-3. Inside it, create a file named `mcp.json`. Copy the sample matching your platform:
-   - **Docker Desktop (Windows / Mac)** → use [`mcp.json`](./mcp.json) (container Ollama):
+3. Inside it, create a file named `mcp.json` (or copy the sample from [`mcp.json`](./mcp.json)).
+4. Use this as the contents:
 
 ```json
 {
@@ -171,32 +149,10 @@ config (applies to every project). Both use the same file format.
 }
 ```
 
-   - **Linux / Colima (native host Ollama)** → use [`mcp.native.json`](./mcp.native.json):
-
-```json
-{
-  "servers": {
-    "hexdocs-mcp": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--network",
-        "host",
-        "ghcr.io/pranaypant/hexdocs-mcp-global:latest"
-      ]
-    }
-  }
-}
-```
-
-> **Why these network modes?** The MCP server's embedded Elixir backend connects to
-> Ollama at the **hardcoded `localhost:11434`** — it does **not** read an `OLLAMA_URL`
-> env var. So "choosing an Ollama" is done by the container's network mode:
-> `container:ollama` shares the Ollama container's loopback (normalizes Docker Desktop),
-> and `host` maps `localhost` to the host (best for native Linux/Colima Ollama).
+> **Why `--network container:ollama`?** The MCP server's embedded Elixir backend
+> connects to Ollama at the **hardcoded `localhost:11434`** — it does **not** read an
+> `OLLAMA_URL` env var. Sharing the Ollama container's network namespace makes the MCP
+> container's `localhost:11434` point directly at Ollama, and works on every platform.
 
 5. **Approve it:** the first time VS Code sees the file it shows a prompt asking
    whether to allow the server. Click **Allow**. (If you miss the prompt, run the
@@ -276,8 +232,8 @@ first with `docker compose up -d`.)
 | `docker pull` → `Error response from daemon: denied` | Local GHCR auth quirk (GHCR often requires a login even for public images)            | `docker login ghcr.io`, then retry                                                                                               |
 | `repository name must be lowercase`                  | Image reference uses uppercase owner                                                  | Use `ghcr.io/pranaypant/...` (all lowercase)                                                                                     |
 | VS Code shows server as **"Failed"**                 | Docker isn't running, or image/tag name is wrong in `mcp.json`                        | Start Docker Desktop/Colima; double-check the image tag is lowercase and pulled                                                  |
-| Server starts but `search` returns `:econnrefused`   | The MCP container can't reach Ollama (the Elixir backend hardcodes `localhost:11434`) | Use the right network mode for your platform: Docker Desktop → `--network container:ollama` with `docker compose up -d`; Linux/Colima native → `--network host` with `ollama serve` running |
-| Server starts but `search` returns `HTTPError 404`   | The embedding model isn't available to the Ollama the MCP container connects to      | Docker Desktop: `docker exec ollama ollama pull nomic-embed-text`; native: `ollama pull nomic-embed-text` (+ `mxbai-embed-large` if requested) |
+| Server starts but `search` returns `:econnrefused`   | The MCP container can't reach Ollama (the Elixir backend hardcodes `localhost:11434`) | Make sure the `ollama` container is running (`docker run`/`docker compose up -d` in step 2) and launch the MCP server with `--network container:ollama` |
+| Server starts but `search` returns `HTTPError 404`   | The embedding model isn't available to the Ollama the MCP container connects to      | `docker exec ollama ollama pull nomic-embed-text` (and/or `mxbai-embed-large`) |
 | Server not listed at all                             | `mcp.json` not approved                                                               | Command palette → **MCP: Review Files with MCP Servers** → **Allow**                                                             |
 
 ## Releasing
