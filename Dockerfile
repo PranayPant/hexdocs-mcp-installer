@@ -21,13 +21,13 @@ RUN apk add --no-cache git curl libstdc++ nodejs npm
 RUN mix local.hex --force && \
     mix local.rebar --force
 
-# Copy static builds from TS stage
+# Copy the compiled build and the full node_modules from the TS builder stage.
+# Reusing node_modules avoids re-running npm in Stage 2 entirely, which sidesteps
+# the upstream `prepare` script's `tsc` requirement and multi-arch install issues.
 COPY --from=ts-builder /app/dist ./dist
 COPY --from=ts-builder /app/package.json ./package.json
 COPY --from=ts-builder /app/package-lock.json ./package-lock.json
-
-# Install production npm dependencies
-RUN npm ci --omit=dev
+COPY --from=ts-builder /app/node_modules ./node_modules
 
 ENV NODE_ENV=production
 ENTRYPOINT ["node", "dist/index.js"]
