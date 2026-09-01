@@ -13,12 +13,9 @@ FROM elixir:1.16-alpine
 WORKDIR /app
 
 # Core runtime system dependencies (keep curl/git for hex operations)
-RUN apk add --no-cache git curl libstdc++
-
-# PERFECT SYNC: Copy Node 22 binaries directly from the official stage
-COPY --from=node:22-alpine /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:22-alpine /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+# Install Node.js + npm via apk so `node`/`npm` are properly on PATH for
+# both AMD64 and ARM64 (the previous COPY --from hack broke under QEMU, exit 127)
+RUN apk add --no-cache git curl libstdc++ nodejs npm
 
 # Pre-bootstrap mix tools to prevent runtime generation loops
 RUN mix local.hex --force && \
@@ -29,7 +26,7 @@ COPY --from=ts-builder /app/dist ./dist
 COPY --from=ts-builder /app/package.json ./package.json
 COPY --from=ts-builder /app/package-lock.json ./package-lock.json
 
-# Now npm is universally available across all platforms (AMD64 & ARM64)
+# Install production npm dependencies
 RUN npm ci --omit=dev
 
 ENV NODE_ENV=production
