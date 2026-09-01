@@ -1,8 +1,9 @@
 # --- Stage 1: Build the TypeScript server wrapper ---
 FROM node:24-alpine AS ts-builder
 WORKDIR /app
+# FIXED: Replaced the malformed repository root link with the complete project path URL
 RUN apk add --no-cache git && \
-    git clone https://github.com . && \
+    https://github.com/bradleygolden/hexdocs-mcp . && \
     git checkout v0.6.0 && \
     npm ci && \
     npm run build
