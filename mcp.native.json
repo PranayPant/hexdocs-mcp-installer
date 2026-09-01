@@ -1,0 +1,16 @@
+{
+  "servers": {
+    "hexdocs-mcp": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--network",
+        "host",
+        "ghcr.io/pranaypant/hexdocs-mcp-global:latest"
+      ]
+    }
+  }
+}
