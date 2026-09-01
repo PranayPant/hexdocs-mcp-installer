@@ -101,10 +101,17 @@ Pick the path for your platform (see the [architecture table](#architecture-deco
 
 **A) Docker Desktop (Windows / Mac) — Ollama container (recommended, default)**
 
+You don't need this repo to get Ollama running — use plain `docker run`:
+
 ```bash
-docker compose up -d         # runs Ollama as container named "ollama"
+docker run -d --name ollama --restart unless-stopped -p 11434:11434 \
+  -v ollama_data:/root/.ollama ollama/ollama:latest
 docker exec ollama ollama pull nomic-embed-text
 ```
+
+> If you've cloned this repo, `docker compose up -d` does the exact same thing
+> (that's what [`docker-compose.yml`](./docker-compose.yml) defines). Both produce a
+> container named `ollama`, which the MCP server expects for `--network container:ollama`.
 
 **B) Linux / Colima — native host Ollama**
 
