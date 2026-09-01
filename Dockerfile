@@ -1,10 +1,10 @@
 # --- Stage 1: Build the TypeScript server wrapper ---
-FROM node:24-alpine AS ts-builder
+FROM node:22-alpine AS ts-builder
 WORKDIR /app
-# FIXED: Replaced the malformed repository root link with the complete project path URL
-RUN apk add --no-cache git && \
-    https://github.com/bradleygolden/hexdocs-mcp . && \
-    git checkout v0.6.0 && \
+# FIXED: Clone the repo properly (was a bare URL line causing "command not found")
+# Also include build tools needed to compile the project's native dependencies
+RUN apk add --no-cache git python3 make g++ build-base && \
+    git clone --depth 1 --branch v0.6.0 https://github.com/bradleygolden/hexdocs-mcp . && \
     npm ci && \
     npm run build
 
@@ -15,9 +15,9 @@ WORKDIR /app
 # Core runtime system dependencies (keep curl/git for hex operations)
 RUN apk add --no-cache git curl libstdc++
 
-# PERFECT SYNC: Copy Node 24 binaries directly from the official stage
-COPY --from=node:24-alpine /usr/local/bin/node /usr/local/bin/node
-COPY --from=node:24-alpine /usr/local/lib/node_modules /usr/local/lib/node_modules
+# PERFECT SYNC: Copy Node 22 binaries directly from the official stage
+COPY --from=node:22-alpine /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:22-alpine /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 # Pre-bootstrap mix tools to prevent runtime generation loops
