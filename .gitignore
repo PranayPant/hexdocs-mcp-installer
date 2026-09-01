@@ -1,0 +1,14 @@
+# Docker
+Dockerfile.*.dev
+compose*.y*ml
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
