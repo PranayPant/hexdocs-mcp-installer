@@ -98,6 +98,11 @@ docker exec ollama ollama pull nomic-embed-text
 > (that's what [`docker-compose.yml`](./docker-compose.yml) defines). Both produce a
 > container named `ollama`, which the MCP server expects for `--network container:ollama`.
 >
+> **If the name `ollama` is already in use** (e.g. a previous run or `docker compose up`),
+> the `docker run` command will report a name conflict — that's fine, your container is
+> already running. Just skip the `docker run` line. To start fresh later, remove it first
+> with `docker rm -f ollama`.
+>
 > Both `nomic-embed-text` and `mxbai-embed-large` are supported; pull whichever the
 > server requests. The published image requests `nomic-embed-text`.
 
